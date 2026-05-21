@@ -1,0 +1,36 @@
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# dbt local credentials and generated artifacts
+banking_dbt/.dbt/
+**/profiles.yml
+banking_dbt/target/
+banking_dbt/dbt_packages/
+banking_dbt/logs/
+banking_dbt/analyses/
+banking_dbt/macros/
+banking_dbt/seeds/
+banking_dbt/tests/
+banking_dbt/README.md
+
+# Runtime logs and local service data
+logs/
+docker/logs/
+docker/minio/
+docker/postgres/
+docker/plugins/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# OS/editor noise
+.DS_Store
+
+logs/
+
+.agents/
+.codex/
+.vscode/
