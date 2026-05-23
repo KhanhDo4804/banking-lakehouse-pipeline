@@ -1,37 +1,37 @@
 # Banking Lakehouse Pipeline
 
-Dự án mô phỏng pipeline dữ liệu ngân hàng theo kiến trúc lakehouse. Dữ liệu giao dịch được sinh giả lập vào PostgreSQL, capture thay đổi bằng Debezium, stream qua Kafka, lưu raw data dạng Parquet vào MinIO, nạp vào Snowflake, biến đổi bằng dbt và trực quan hóa bằng Power BI.
+This project simulates an end-to-end banking data pipeline using a lakehouse-style architecture. Fake banking data is generated into PostgreSQL, captured through Debezium CDC, streamed through Kafka, stored as Parquet files in MinIO, loaded into Snowflake, transformed with dbt, and visualized in Power BI.
 
 ![Banking lakehouse architecture](images/Architecture.jpg)
 
-## Mục tiêu
+## Goals
 
-- Mô phỏng nguồn dữ liệu banking gồm `customers`, `accounts`, `transactions`.
-- Xây dựng luồng CDC từ PostgreSQL sang Kafka bằng Debezium.
-- Lưu dữ liệu raw theo dạng Parquet trên MinIO để mô phỏng data lake.
-- Nạp dữ liệu raw vào Snowflake và tổ chức theo các lớp `raw`, `staging`, `marts`.
-- Dùng dbt để tạo staging model, fact, dimension và snapshot SCD Type 2.
-- Dùng Airflow để điều phối load dữ liệu và chạy dbt.
+- Simulate a banking source system with `customers`, `accounts`, and `transactions`.
+- Build a CDC pipeline from PostgreSQL to Kafka using Debezium.
+- Store raw data as Parquet files in MinIO to simulate a data lake.
+- Load raw data into Snowflake and organize it into `raw`, `staging`, and `marts` layers.
+- Use dbt to build staging models, facts, dimensions, and SCD Type 2 snapshots.
+- Use Airflow to orchestrate data loading and dbt jobs.
 
-## Luồng xử lý
+## Data Flow
 
-1. `data-generator/faker_generator.py` sinh dữ liệu giả lập vào PostgreSQL.
-2. Debezium đọc WAL của PostgreSQL và publish CDC event vào Kafka topic:
+1. `data-generator/faker_generator.py` generates fake banking records into PostgreSQL.
+2. Debezium reads PostgreSQL WAL changes and publishes CDC events to Kafka topics:
    - `banking_server.public.customers`
    - `banking_server.public.accounts`
    - `banking_server.public.transactions`
-3. `kafka/consumer/kafka_to_minio.py` consume Kafka event, gom batch và ghi Parquet vào MinIO bucket `raw`.
-4. Airflow DAG `minio_to_snowflake_banking` tải Parquet từ MinIO và load vào các bảng raw trên Snowflake.
-5. Airflow DAG `SCD2_snapshots` chạy `dbt snapshot` và `dbt run --select marts`.
-6. Power BI đọc dữ liệu marts từ Snowflake để dựng dashboard.
+3. `kafka/consumer/kafka_to_minio.py` consumes Kafka events, batches records, and writes Parquet files to the MinIO `raw` bucket.
+4. Airflow DAG `minio_to_snowflake_banking` downloads Parquet files from MinIO and loads them into Snowflake raw tables.
+5. Airflow DAG `SCD2_snapshots` runs `dbt snapshot` and `dbt run --select marts`.
+6. Power BI reads the mart layer from Snowflake to build the dashboard.
 
 ## Tech Stack
 
-| Thành phần | Công nghệ |
+| Component | Technology |
 | --- | --- |
 | Source database | PostgreSQL 15 |
 | CDC | Debezium, Kafka Connect |
-| Streaming | Apache Kafka, Zookeeper |
+| Streaming | Apache Kafka, ZooKeeper |
 | Object storage | MinIO |
 | Orchestration | Apache Airflow |
 | Data warehouse | Snowflake |
@@ -39,32 +39,32 @@ Dự án mô phỏng pipeline dữ liệu ngân hàng theo kiến trúc lakehous
 | Visualization | Power BI |
 | Data generator | Python, Faker |
 
-## Cấu trúc thư mục
+## Repository Structure
 
 ```text
 .
 +-- banking_dbt/                  # dbt project: staging, marts, snapshots
-+-- data-generator/               # Script sinh dữ liệu banking giả lập
++-- data-generator/               # Fake banking data generator
 +-- docker/dags/                  # Airflow DAGs
-+-- images/                       # Ảnh kiến trúc và dashboard
-+-- kafka/consumer/               # Kafka consumer ghi dữ liệu vào MinIO
-+-- kafka/kafka-debezium/         # Script tạo Debezium connector
-+-- postgres/                     # SQL tạo bảng nguồn PostgreSQL
-+-- docker-compose.yml            # Hạ tầng local
-+-- dockerfile-airflow.dockerfile # Airflow image có dbt
++-- images/                       # Architecture and dashboard images
++-- kafka/consumer/               # Kafka consumer that writes data to MinIO
++-- kafka/kafka-debezium/         # Debezium connector creation script
++-- postgres/                     # PostgreSQL source table DDL
++-- docker-compose.yml            # Local infrastructure
++-- dockerfile-airflow.dockerfile # Airflow image with dbt installed
 +-- requirements.txt              # Python dependencies
 ```
 
-## Điều kiện cần
+## Prerequisites
 
-- Docker và Docker Compose.
-- Python 3.10+.
-- Tài khoản Snowflake có quyền tạo database, schema, table và chạy warehouse.
-- Power BI Desktop nếu muốn mở hoặc dựng dashboard.
+- Docker and Docker Compose.
+- Python 3.10 or later.
+- A Snowflake account with permission to create databases, schemas, tables, and run a warehouse.
+- Power BI Desktop if you want to open or rebuild the dashboard.
 
-## Cấu hình môi trường
+## Environment Configuration
 
-Tạo các file `.env` từ mẫu:
+Create local `.env` files from the examples:
 
 ```bash
 cp .env.example .env
@@ -74,19 +74,23 @@ cp kafka/consumer/.env.example kafka/consumer/.env
 cp docker/dags/.env.example docker/dags/.env
 ```
 
-Kiểm tra lại các nhóm biến chính:
+Review the main environment groups:
 
-- `.env`: credential cho PostgreSQL, MinIO và Airflow metadata database.
-- `data-generator/.env`: kết nối từ máy host vào PostgreSQL qua `localhost:5432`.
-- `kafka/kafka-debezium/.env`: kết nối từ container Debezium vào PostgreSQL qua hostname `postgres`.
-- `kafka/consumer/.env`: Kafka broker `localhost:29092`, MinIO endpoint `http://localhost:9000`.
-- `docker/dags/.env`: credential MinIO nội bộ container và credential Snowflake.
+- `.env`: credentials for PostgreSQL, MinIO, and the Airflow metadata database.
+- `data-generator/.env`: host-to-PostgreSQL connection through `localhost:5432`.
+- `kafka/kafka-debezium/.env`: Debezium-to-PostgreSQL connection through Docker hostname `postgres`.
+- `kafka/consumer/.env`: Kafka broker `localhost:29092` and MinIO endpoint `http://localhost:9000`.
+- `docker/dags/.env`: MinIO credentials inside Docker and Snowflake credentials.
 
-Nếu dùng Linux, đặt `AIRFLOW_UID` trong `.env` bằng kết quả của lệnh `id -u`.
+On Linux, set `AIRFLOW_UID` in `.env` to the output of:
 
-## Cài Python dependencies
+```bash
+id -u
+```
 
-Các script Debezium connector, Kafka consumer và data generator chạy từ máy host:
+## Install Python Dependencies
+
+The Debezium connector script, Kafka consumer, and data generator run from the host machine:
 
 ```bash
 python -m venv .venv
@@ -94,16 +98,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Khởi động hạ tầng local
+## Start Local Infrastructure
 
-Build Airflow image và chạy các service nền:
+Build the Airflow image and start the base services:
 
 ```bash
 docker compose build
 docker compose up -d postgres zookeeper kafka connect minio airflow-postgres
 ```
 
-Khởi tạo metadata database và user cho Airflow:
+Initialize the Airflow metadata database and create an admin user:
 
 ```bash
 docker compose run --rm --no-deps airflow-webserver airflow db migrate
@@ -117,7 +121,7 @@ docker compose run --rm --no-deps airflow-webserver airflow users create \
 docker compose up -d airflow-webserver airflow-scheduler
 ```
 
-Các UI/service chính:
+Main local services:
 
 | Service | URL |
 | --- | --- |
@@ -125,53 +129,53 @@ Các UI/service chính:
 | MinIO Console | http://localhost:9001 |
 | Debezium Connect API | http://localhost:8083 |
 | PostgreSQL | `localhost:5432` |
-| Kafka broker từ host | `localhost:29092` |
+| Kafka broker from host | `localhost:29092` |
 
-## Tạo bảng nguồn PostgreSQL
+## Create PostgreSQL Source Tables
 
-Chạy DDL tạo 3 bảng nguồn:
+Run the DDL for the three source tables:
 
 ```bash
 docker compose exec -T postgres psql -U postgres -d banking < postgres/create_table.sql
 ```
 
-Nếu đã đổi `POSTGRES_USER` hoặc `POSTGRES_DB` trong `.env`, thay lại tham số `-U` và `-d` cho khớp.
+If you changed `POSTGRES_USER` or `POSTGRES_DB` in `.env`, update the `-U` and `-d` values accordingly.
 
-## Tạo Debezium connector
+## Create the Debezium Connector
 
 ```bash
 python kafka/kafka-debezium/create_debezium_connector.py
 ```
 
-Connector sẽ theo dõi các bảng:
+The connector watches these source tables:
 
 - `public.customers`
 - `public.accounts`
 - `public.transactions`
 
-## Chạy pipeline streaming
+## Run the Streaming Pipeline
 
-Mở một terminal để chạy Kafka consumer:
+Open one terminal for the Kafka consumer:
 
 ```bash
 source .venv/bin/activate
 python kafka/consumer/kafka_to_minio.py
 ```
 
-Mở terminal khác để sinh dữ liệu:
+Open another terminal for the data generator:
 
 ```bash
 source .venv/bin/activate
 python data-generator/faker_generator.py
 ```
 
-Nếu chỉ muốn sinh một batch rồi dừng:
+To generate only one batch and exit:
 
 ```bash
 python data-generator/faker_generator.py --once
 ```
 
-Consumer sẽ ghi file Parquet vào MinIO theo cấu trúc:
+The consumer writes Parquet files to MinIO using this layout:
 
 ```text
 s3://raw/customers/date=YYYY-MM-DD/*.parquet
@@ -179,9 +183,9 @@ s3://raw/accounts/date=YYYY-MM-DD/*.parquet
 s3://raw/transactions/date=YYYY-MM-DD/*.parquet
 ```
 
-## Chuẩn bị Snowflake
+## Prepare Snowflake
 
-Tạo database, schema và raw tables để Airflow load Parquet:
+Create the database, schemas, and raw tables used by the Airflow load DAG:
 
 ```sql
 CREATE DATABASE IF NOT EXISTS banking;
@@ -193,23 +197,26 @@ CREATE TABLE IF NOT EXISTS banking.raw.accounts (v VARIANT);
 CREATE TABLE IF NOT EXISTS banking.raw.transactions (v VARIANT);
 ```
 
-Cập nhật credential Snowflake trong:
+Update Snowflake credentials in:
 
 - `docker/dags/.env`
 - `banking_dbt/.dbt/profiles.yml`
 
-Không commit credential thật vào repository. Với môi trường chia sẻ, nên dùng file example hoặc secret manager.
+Do not commit real credentials to the repository. For shared environments, use example files or a secret manager.
 
-## Chạy Airflow và dbt
+## Run Airflow and dbt
 
-Truy cập Airflow tại http://localhost:8080 với user `admin` và password `admin`.
+Open Airflow at http://localhost:8080 and log in with:
 
-Bật và trigger các DAG theo thứ tự:
+- Username: `admin`
+- Password: `admin`
 
-1. `minio_to_snowflake_banking`: load dữ liệu Parquet từ MinIO vào Snowflake raw tables.
-2. `SCD2_snapshots`: chạy dbt snapshot và build marts.
+Enable and trigger the DAGs in this order:
 
-Có thể kiểm tra dbt trực tiếp từ host:
+1. `minio_to_snowflake_banking`: loads Parquet data from MinIO into Snowflake raw tables.
+2. `SCD2_snapshots`: runs dbt snapshots and builds the mart layer.
+
+You can also validate dbt directly from the host:
 
 ```bash
 cd banking_dbt
@@ -220,30 +227,30 @@ dbt run --select marts --profiles-dir .dbt
 
 ## dbt Models
 
-| Layer | Model | Mục đích |
+| Layer | Model | Purpose |
 | --- | --- | --- |
-| Staging | `stg_customer` | Chuẩn hóa customer raw event, lấy bản ghi mới nhất theo `customer_id` |
-| Staging | `stg_account` | Chuẩn hóa account raw event, lấy bản ghi mới nhất theo `account_id` |
-| Staging | `stg_transaction` | Chuẩn hóa transaction raw event |
-| Snapshot | `customers_snapshot` | Theo dõi thay đổi customer theo SCD Type 2 |
-| Snapshot | `accounts_snapshot` | Theo dõi thay đổi account theo SCD Type 2 |
-| Mart | `dim_customer` | Dimension customer có hiệu lực theo thời gian |
-| Mart | `dim_account` | Dimension account có hiệu lực theo thời gian |
-| Mart | `fact_transaction` | Fact giao dịch, incremental theo `transaction_id` |
+| Staging | `stg_customer` | Standardizes customer raw events and keeps the latest record per `customer_id` |
+| Staging | `stg_account` | Standardizes account raw events and keeps the latest record per `account_id` |
+| Staging | `stg_transaction` | Standardizes transaction raw events |
+| Snapshot | `customers_snapshot` | Tracks customer changes using SCD Type 2 |
+| Snapshot | `accounts_snapshot` | Tracks account changes using SCD Type 2 |
+| Mart | `dim_customer` | Time-aware customer dimension |
+| Mart | `dim_account` | Time-aware account dimension |
+| Mart | `fact_transaction` | Incremental transaction fact table keyed by `transaction_id` |
 
 ## Dashboard
 
-Dashboard Power BI minh họa các chỉ số tổng quan như tổng khách hàng, tổng tài khoản, tổng giao dịch, số dư trung bình và phân bổ giao dịch theo loại.
+The Power BI dashboard shows high-level banking metrics such as total customers, total accounts, total transactions, average balance, and transaction distribution by type.
 
 ![Power BI banking dashboard](images/Visualization.jpg)
 
-## Dừng môi trường
+## Stop the Environment
 
 ```bash
 docker compose down
 ```
 
-Nếu muốn xóa cả dữ liệu volume/container state local:
+To also remove local volumes and runtime state:
 
 ```bash
 docker compose down -v
@@ -251,8 +258,8 @@ docker compose down -v
 
 ## Troubleshooting
 
-- Debezium không tạo connector: kiểm tra container `connect` đã chạy và endpoint `http://localhost:8083/connectors` sẵn sàng.
-- Không có Kafka message: kiểm tra PostgreSQL đã bật logical replication trong `docker-compose.yml` và bảng nguồn đã có dữ liệu mới.
-- Consumer không ghi MinIO: kiểm tra `kafka/consumer/.env`, bucket `raw` và MinIO credential.
-- Airflow load Snowflake lỗi: kiểm tra raw tables đã tồn tại, warehouse đang chạy và credential trong `docker/dags/.env`.
-- dbt lỗi profile: kiểm tra `banking_dbt/.dbt/profiles.yml`, account Snowflake, role, warehouse, database và schema.
+- Debezium connector cannot be created: check that the `connect` container is running and `http://localhost:8083/connectors` is available.
+- No Kafka messages appear: check that PostgreSQL logical replication is enabled in `docker-compose.yml` and that new rows exist in the source tables.
+- Consumer does not write to MinIO: check `kafka/consumer/.env`, the `raw` bucket, and MinIO credentials.
+- Airflow fails to load Snowflake: check that raw tables exist, the warehouse is running, and credentials in `docker/dags/.env` are correct.
+- dbt profile fails: check `banking_dbt/.dbt/profiles.yml`, Snowflake account, role, warehouse, database, and schema.
