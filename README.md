@@ -46,7 +46,7 @@ This project simulates an end-to-end banking data pipeline using a lakehouse-sty
 +-- banking_dbt/                  # dbt project: staging, marts, snapshots
 +-- data-generator/               # Fake banking data generator
 +-- docker/dags/                  # Airflow DAGs
-+-- images/                       # Architecture and dashboard images
++-- images/                       # Architecture, data model, and dashboard images
 +-- kafka/consumer/               # Kafka consumer that writes data to MinIO
 +-- kafka/kafka-debezium/         # Debezium connector creation script
 +-- postgres/                     # PostgreSQL source table DDL
@@ -237,6 +237,12 @@ dbt run --select marts --profiles-dir .dbt
 | Mart | `dim_customer` | Time-aware customer dimension |
 | Mart | `dim_account` | Time-aware account dimension |
 | Mart | `fact_transaction` | Incremental transaction fact table keyed by `transaction_id` |
+
+## Power BI Data Model
+
+The Power BI semantic model uses a simple star schema. `FACT_TRANSACTION` stores transaction-level measures and foreign keys, while `DIM_CUSTOMER` and `DIM_ACCOUNT` provide customer and account context for analysis.
+
+![Power BI data model](images/data_model.jpg)
 
 ## Dashboard
 
